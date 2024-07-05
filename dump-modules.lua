@@ -14,6 +14,11 @@ end
 dofile("binary-creator.lua")
 loaded_modules["$!main!$"] = "binary-creator.lua"
 
+local Path = require("utilities.Path")
+for k, v in pairs(loaded_modules) do
+    loaded_modules[k] = tostring(Path.new(v):expand():absolute():relative_to(Path.current_directory))
+end
+
 local f = assert(io.open("dumped-modules.lua", "w+b"))
 f:write("return {", "\n")
 for k, v in pairs(loaded_modules) do
