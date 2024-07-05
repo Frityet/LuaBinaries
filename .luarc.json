@@ -12,7 +12,8 @@
         "type-check": "Error",
         "unbalanced": "Error",
         "unused": "Hint",
-        "conventions": "Error"
+        "conventions": "Error",
+
     },
     "diagnostics.disable": [
         "duplicate-doc-alias",

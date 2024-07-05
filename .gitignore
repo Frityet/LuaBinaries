@@ -3,3 +3,5 @@
 /lua_modules
 /.luarocks
 /dumped-modules.lua
+/lua-aot
+/out

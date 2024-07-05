@@ -1,7 +1,5 @@
-#!/usr/bin/env ./lua
-
-local Path = require("Path")
 local easyhttp = require("easyhttp")
+local Path = require("Path")
 ---@type argparse
 local argparse = require("argparse")
 local pretty = require("pl.pretty")

@@ -10,7 +10,7 @@
             "request": "launch",
             "program": {
                 "lua": "lua",
-                "file": "binary-creator.lua",
+                "file": "${file}",
             },
             "env" : {
                 "LUA_PATH": "?.lua;?/init.lua;lua_modules/share/lua/5.4/?.lua;lua_modules/share/lua/5.4/?/init.lua",

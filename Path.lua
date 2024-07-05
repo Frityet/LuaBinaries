@@ -116,44 +116,19 @@ end
 ---@param recursive boolean?
 ---@return fun(): Path?
 function Path:entries(recursive)
-    -- local entries = {}
-    -- local idx = 1
-
-    -- for entry in lfs.dir(tostring(self)) do
-    --     if entry ~= "." and entry ~= ".." then
-    --         local p = self/entry
-    --         table.insert(entries, p)
-    --     end
-    -- end
-
-    -- return function()
-    --     if idx <= #entries then
-    --         local result = entries[idx]
-    --         idx = idx + 1
-    --         return result
-
-    --     ---@diagnostic disable-next-line: missing-return
-    --     end
-    -- end
-
----@diagnostic disable: assign-type-mismatch
-    ---@type (fun(iter: userdata): string), userdata
-    local iter, dir = lfs.dir(tostring(self))
----@diagnostic enable: assign-type-mismatch
-
---we cant use coroutines here unfortunately
-    return function()
-        local entry = iter(dir)
-        if entry == nil then return end
-        if entry ~= "." and entry ~= ".." then
-            local p = self/entry
-            if recursive and p:type() == "directory" then
-
+    return coroutine.wrap(function ()
+        for entry in lfs.dir(tostring(self)) do
+            if entry ~= "." and entry ~= ".." then
+                local path = self/entry
+                coroutine.yield(path)
+                if recursive and path:type() == "directory" then
+                    for subentry in path:entries(true) do
+                        coroutine.yield(subentry)
+                    end
+                end
             end
-            return p
         end
-        return iter(dir)
-    end
+    end)
 end
 
 
@@ -387,6 +362,24 @@ end
 function Path:absolute()
     if self:is_absolute() then return self end
     return Path.current_directory/self
+end
+
+---@return integer?, string?
+function Path:size()
+    local size = 0
+    if self:type() == "directory" then
+        for entry in self:entries() do
+            local entry_size, err = entry:size()
+            if not entry_size then return nil, err end
+            size = size + entry_size
+        end
+    else
+        local f, err = self:open("file", "rb")
+        if not f then return nil, err end
+        size = f:seek("end")
+        f:close()
+    end
+    return size
 end
 
 -- setmetatable(Path, { __call = function(_, ...) return Path.new(...) end })
