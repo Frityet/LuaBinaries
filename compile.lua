@@ -1,19 +1,17 @@
 #!/usr/bin/env ./lua
 
-local Path = require("Path")
-local hash = require("sha2")
+local Path = require("utilities.Path")
+local hash = require("utilities.hash")
 local tablex = require("pl.tablex")
 local pretty = require("pl.pretty")
 local sysdetect = require("sysdetect")
 local LUAOT_GIT_REPO = "https://github.com/Frityet/lua-aot-5.4"
 local LUAOT_GIT_BRANCH = "self-loader"
 
--- local is_windows = package.config:sub(1, 1) == "\\"
--- local is_macos = not is_windows and os.getenv("OSTYPE"):lower():find("darwin")
--- local is_linux = not is_windows and not is_macos
 ---@type "windows" | "macosx" | "linux" | string
 local operating_system = sysdetect.detect()
 
+local DEBUG = os.getenv("DEBUG") == "1"
 local CC = os.getenv("CC") or "cc"
 local CFLAGS = os.getenv("CFLAGS") or "-Os -fPIC"
 local LD = os.getenv("LD") or CC
@@ -25,18 +23,21 @@ local ARFLAGS = os.getenv("ARFLAGS") or "rcs"
 ---@type { [string] : string, ["$!main!$"]: string }
 local dumped_mods = assert(dofile("dumped-modules.lua"), "You must run the program once with `./dump-modules.lua` before trying to compile!")
 
-print("Compile info:")
-pretty {
-    CC = CC,
-    CFLAGS = CFLAGS,
-    LD = LD,
-    LDFLAGS = LDFLAGS,
-    LIBS = LIBS,
-    AR = AR,
-    ARFLAGS = ARFLAGS,
-    OS = operating_system,
-    ["modules to compile"] = dumped_mods
-}
+if DEBUG then
+    print("Compile info:")
+    pretty {
+        CC = CC,
+        CFLAGS = CFLAGS,
+        LD = LD,
+        LDFLAGS = LDFLAGS,
+        LIBS = LIBS,
+        AR = AR,
+        ARFLAGS = ARFLAGS,
+        OS = operating_system,
+        DEBUG = DEBUG,
+        ["modules to compile"] = dumped_mods
+    }
+end
 
 --#region Helper functions
 
@@ -60,20 +61,14 @@ local function execute(cmd, debug)
 end
 
 ---os.execute that properly handles 5.1 and 5.4
----@param debug boolean | string
 ---@param ... string | Path
-local function exec(debug, ...)
+local function exec(...)
     local cmd = ""
-    --if the last argument is `false`, don't print
-    if debug ~= false then
-        cmd = debug.." "
-        debug = true
-    end
 
     for i = 1, select("#", ...) do
         cmd = cmd..tostring(select(i, ...)).." "
     end
-    if not execute(cmd, debug) then
+    if not execute(cmd, DEBUG) then
         error("Failed to execute command: "..cmd)
     end
 end
@@ -90,7 +85,7 @@ local function luarocks(...)
         for k, v in pairs(env) do
             env_str = env_str..k.."=\""..tostring(v).."\" "
         end
-        if not execute(cmd..env_str, true) then
+        if not execute(cmd..env_str, DEBUG) then
             error("Failed to execute command: "..cmd)
         end
     end
@@ -111,6 +106,19 @@ local function progress_bar(current, total)
     local percent = current/total
     local bar = string.rep("■", math.floor(percent*width))
     return string.format("[\x1b[32m%s\x1b[0m%s] \x1b[33m(%d/%d) %.2f%%", bar, string.rep(" ", width-math.floor(percent*width)), current, total, percent*100)
+end
+
+---@param path Path
+---@return string
+local function hash_file(path)
+    local f = assert(path:open("file", "rb"))
+    local h = hash.sha256()
+    for chunk in f:lines(4096) do
+        h(chunk)
+    end
+    f:close()
+    return h() --[[@as string]]
+
 end
 
 --#endregion
@@ -166,6 +174,18 @@ end
 
 local total_module_count = #tablex.filter(tablex.values(dumped_mods), function(v) return Path.new(v):extension() == "lua" end)
 local transpiled_lua_file_count = 0
+
+local cmodule_hash_file = Path.current_directory/"cmodule-hashes.lua"
+
+---Used for detecting if there are any changes in the lua files, the C files will have the same hash if the lua file hasn't changed
+---@type { [string] : string }
+local cmodule_hashes
+if cmodule_hash_file:exists() then
+    cmodule_hashes = assert(dofile(tostring(cmodule_hash_file)))
+else
+    cmodule_hashes = {}
+end
+
 ---@param modname string
 ---@param path Path
 ---@param is_main boolean
@@ -178,9 +198,9 @@ local function compile_lua(modname, path, is_main)
 
     local cfile = (comp_dir/name):remove_extension():add_extension("c")
     if is_main then
-        exec(false, tostring(luaot_dir/"luaot"), path, "-o", cfile, "-m", name, "-e", "-i", is_windows and "windows" or "posix")
+        exec(tostring(luaot_dir/"luaot"), path, "-o", cfile, "-m", name, "-e", "-i", operating_system == "windows" and "windows" or "posix")
     else
-        exec(false, tostring(luaot_dir/"luaot"), path, "-o", cfile, "-m", name)
+        exec(tostring(luaot_dir/"luaot"), path, "-o", cfile, "-m", name)
     end
 
     transpiled_lua_file_count = transpiled_lua_file_count + 1
@@ -232,30 +252,44 @@ local makefile = assert(makefile_path:open("file", "w+b"))
 local ar_files = {}
 print("--- Compiling C files ---")
 for modname, mod in pairs(c_files) do
+    --check if the lua file has changed
+    local hash = hash_file(mod.path)
+    local ar_file = (obj_dir/mod.symbol_name):add_extension("a")
+    if cmodule_hashes[modname] == hash then
+        print("\x1b[33mSkipped \x1b[34m"..modname.."\x1b[0m - \x1b[32mNo changes\x1b[0m")
+        table.insert(ar_files, ar_file)
+        goto continue
+    end
+
     --first, compile all of them to objects
     ---@type Path[]
     local objects = {}
     local compmsg = string.format("\x1b[33m[%d/%d (%.2f%%)] \x1b[32mCompiling \x1b[34m%s\x1b[0m... ",  #ar_files, total_module_count, #ar_files/total_module_count*100, modname)
     io.write("\x1b[?25l"):flush()
     for i, dep in ipairs(mod.dependent_modules) do
-        exec(false, CC, CFLAGS, "-c", dep, "-o", dep:add_extension("o"), "-I", luaot_dir)
+        exec(CC, CFLAGS, "-c", dep, "-o", dep:add_extension("o"), "-I", luaot_dir)
         io.write(compmsg, progress_bar(i, #mod.dependent_modules), "\r"):flush()
         table.insert(objects, dep:add_extension("o"))
     end
     if not mod.is_main then
-        exec(false, CC, CFLAGS, "-c", mod.path, "-o", mod.path:add_extension("o"), "-I", luaot_dir)
+        exec(CC, CFLAGS, "-c", mod.path, "-o", mod.path:add_extension("o"), "-I", luaot_dir)
     end
-    exec(false, CC, CFLAGS, "-c", mod.path, "-o", mod.path:add_extension("o"), "-I", luaot_dir, mod_def_list)
+    exec(CC, CFLAGS, "-c", mod.path, "-o", mod.path:add_extension("o"), "-I", luaot_dir, mod_def_list)
     table.insert(objects, mod.path:add_extension("o"))
 
-    --now, compile it to a static library
-    local ar_file = (obj_dir/mod.symbol_name):add_extension("a")
-    exec(false, AR, ARFLAGS, ar_file, table.unpack(objects))
+    exec(AR, ARFLAGS, ar_file, table.unpack(objects))
     table.insert(ar_files, ar_file)
     local arsize = ar_file:size()
     local arsize_str = string.format("%s, %s", #mod.dependent_modules..(#mod.dependent_modules == 1 and " function" or " functions"), arsize and human_size(arsize) or "unknown size")
     print(string.format("\x1b[?25h\r\x1b[33m[%d/%d (%.2f%%)] \x1b[32mCompiled \x1b[34m%s\x1b[0m \x1b[33m(%s)\x1b[0m\x1b[0K", #ar_files, total_module_count, #ar_files/total_module_count*100, modname, arsize_str))
+
+    cmodule_hashes[modname] = hash
+    ::continue::
 end
+
+local f = assert(cmodule_hash_file:open("file", "w+b"))
+f:write("return ", pretty.write(cmodule_hashes))
+f:close()
 
 ---@type { [string] : boolean }
 local luaopens = {}
@@ -282,7 +316,7 @@ for modname, path in pairs(dumped_mods) do
 end
 --finally, compile it all together
 local mainmod = c_files["$!main!$"]
-exec(false, CC, CFLAGS, "-c", mainmod.path, "-o", mainmod.path:add_extension("o"), "-I", luaot_dir, mod_def_list)
+exec(CC, CFLAGS, "-c", mainmod.path, "-o", mainmod.path:add_extension("o"), "-I", luaot_dir, mod_def_list)
 
 --#endregion
 
@@ -311,6 +345,9 @@ else
 end
 
 exec(LD, LDFLAGS, "-o", out_file, "-L", luaot_dir, "-llua", LIBS, mainmod.path:add_extension("o"), table.unpack(ar_files))
+
+local outsiz = out_file:size()
+print(string.format("\x1b[32mLinked \x1b[34m%s\x1b[0m \x1b[33m(%s)\x1b[0m", out_file, outsiz and human_size(outsiz) or "unknown size"))
 
 makefile:close()
 

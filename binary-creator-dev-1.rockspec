@@ -14,7 +14,7 @@ dependencies = {
    "argparse",
    "sysdetect",
    "lua-zlib",
-   "luarocks", --for tar
+   "luazip",
    "easy-http >= 0.1.1"
 }
 build = {
@@ -26,10 +26,13 @@ build = {
    },
 
    modules = {
-      ["Path"] = "path.lua",
       ["builders"] = "builders/init.lua",
       ["builders.puc"] = "builders/puc/init.lua",
       ["builders.puc.posix"] = "builders/puc/posix.lua",
       ["builders.puc.windows"] = "builders/puc/windows.lua",
+      ["utilities"] = "utilities/init.lua",
+      ["Path"] = "utilities/Path.lua",
+      ["tar"] = "utilities/tar.lua",
+      ["hash"] = "utilities/hash.lua"
    }
 }

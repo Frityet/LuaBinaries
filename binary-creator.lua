@@ -1,9 +1,9 @@
+#!/usr/bin/env lua
+local utilities = require("utilities")
 local easyhttp = require("easyhttp")
-local Path = require("Path")
+local Path = require("utilities.Path")
 ---@type argparse
 local argparse = require("argparse")
-local pretty = require("pl.pretty")
-local tablex = require("pl.tablex")
 local sysdetect = require("sysdetect")
 local builders = require("builders")
 
@@ -68,7 +68,7 @@ end
 
 ---@return { [string] : string }
 local function fetch_lua_releases()
-    local body, code, headers = easyhttp.request(LUA_RELEASE_PAGE_URL )
+    local body, code, headers = easyhttp.request(LUA_RELEASE_PAGE_URL)
     if not body then error("Could not create request: "..code) end
     --[[@cast code integer]]
     --[[@cast body string]]
@@ -77,7 +77,7 @@ local function fetch_lua_releases()
     end
 
     local releases = {
-        ["LuaJIT-2.1.0"] = LUAJIT_RELEASE_ARCHIVE_URL,
+        ["LuaJIT"] = LUAJIT_RELEASE_ARCHIVE_URL,
     }
     for release in body:gmatch('HREF="lua%-([%d.]+)%.tar%.gz"') do
         releases[release] = string.format("https://www.lua.org/ftp/lua-%s.tar.gz", release)
@@ -90,7 +90,11 @@ local releases
 if not RELEASE_CACHE_PATH:exists() then
     releases = fetch_lua_releases()
     local f = assert(RELEASE_CACHE_PATH:open("file", "w+b"))
-    f:write("return ", pretty.write(releases))
+    f:write("return {", "\n")
+    for k, v in pairs(releases) do
+        f:write(string.format('    ["%s"] = "%s";\n', k, v))
+    end
+    f:write("}\n")
     f:close()
 else
     releases = dofile(tostring(RELEASE_CACHE_PATH))
@@ -107,7 +111,7 @@ local found_make = check_program(os.getenv("MAKE") or "make")
                             or check_program("make")
                             or check_program("mingw32-make")
 
-local versions = tablex.keys(releases)
+local versions = utilities.keys(releases)
 table.sort(versions)
 local parser = argparse("binary-creator", "Automatically compile and package lua binaries")
 parser  :argument "version"
@@ -142,8 +146,26 @@ parser  :option "--make"
         :default(found_make)
         :args(1)
 
+parser  :option "-o --output"
+        :description "The output directory"
+        :args(1)
+
+parser  :option "-j --jobs"
+        :description "The number of jobs to run in parallel"
+        :default((function ()
+            local nproc = io.popen("nproc", "r")
+            if nproc then
+                local jobs = nproc:read("*a"):gsub("\n", "")
+                nproc:close()
+                return jobs
+            end
+            return 4
+        end)())
+        :args(1)
+
 parser:add_help(true)
 parser:add_complete()
+
 
 ---@class CLIArgs
 ---@field version string
@@ -152,11 +174,19 @@ parser:add_complete()
 ---@field c_compiler string
 ---@field linker string
 ---@field make string?
+---@field output Path
+---@field jobs number
 local args = parser:parse()
 
 if not args.c_compiler then error("No C compiler found") end
 if not args.linker then error("No linker found") end
+if not args.output then error("No output directory specified")
+else
+    args.output = assert(Path.new(args.output):expand()):absolute()
+end
 
-if args.version ~= "LuaJIT-2.1.0" then
+if args.version ~= "LuaJIT" then
     builders.puc[args.os](args, releases[args.version])
+else
+    builders.jit[args.os](args, LUAJIT_RELEASE_ARCHIVE_URL)
 end

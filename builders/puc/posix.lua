@@ -1,21 +1,7 @@
-local easyhttp = require("easyhttp")
-local Path = require("Path")
+local download = require("builders.puc.download")
 
----@param args CLIArgs
----@param url string
 return function (args, url)
-    local out_archive_path = Path.temporary("directory")/string.format("lua-%s.tar.gz", args.version)
-    do
-        local out_archive = assert(out_archive_path:open("file", "w+b"))
-        local response, err = easyhttp.request(url, {
-            method = "GET",
-            on_progress = function(dltotal, dlnow, ultotal, ulnow)
-                io.write(string.format("\rDownloading %s: %.2f%%", url, math.floor(dlnow / dltotal * 100))):flush()
-            end,
-            output_file = out_archive
-        })
-        if not response then error(string.format("Failed to fetch %s: %s", url, err)) end
-        out_archive:close()
-    end
-    print("\nDownloaded to "..tostring(out_archive_path))
+    local srcdir = download(args.version, url)
+    os.exec(args.make.." -j"..args.jobs.." -C "..tostring(srcdir).." guess")
+    os.exec(args.make.." -j"..args.jobs.." -C "..tostring(srcdir).." install INSTALL_TOP="..tostring(args.output))
 end

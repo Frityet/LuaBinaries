@@ -1,4 +1,5 @@
 #!/usr/bin/env ./lua
+if os.getenv("LOCAL_LUA_DEBUGGER_VSCODE") == "1" then require("lldebugger").start() end
 ---@type string[]
 local loaded_modules = {}
 local l_require = require
@@ -10,13 +11,15 @@ function require(name)
     return ret, data
 end
 
-local pretty = require("pl.pretty")
-
 dofile("binary-creator.lua")
 loaded_modules["$!main!$"] = "binary-creator.lua"
 
 local f = assert(io.open("dumped-modules.lua", "w+b"))
-f:write("return ", pretty.write(loaded_modules))
+f:write("return {", "\n")
+for k, v in pairs(loaded_modules) do
+    f:write(string.format('    ["%s"] = "%s";', k, v), "\n")
+end
+f:write("}", "\n")
 f:close()
 print("Dumped modules to dumped-modules.lua")
 require = l_require
