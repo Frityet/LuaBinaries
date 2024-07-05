@@ -1,11 +1,11 @@
-package = "binary-creator"
+package = "binary-toolkit"
 version = "dev-1"
 source = {
-   url = "*** please add URL for source tarball, zip or repository here ***"
+   url = "https://github.com/Frityet/LuaBinaries.git"
 }
 description = {
-   homepage = "*** please enter a project homepage ***",
-   license = "*** please specify a license ***"
+   homepage = "https://github.com/Frityet/LuaBinaries",
+   license = "MIT"
 }
 dependencies = {
    "lua ~> 5.4",
@@ -21,7 +21,7 @@ build = {
    type = "builtin",
    install = {
       bin = {
-         ["binary-creator"] = "binary-creator.lua"
+         ["binary-toolkit"] = "main.lua"
       }
    },
 

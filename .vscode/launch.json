@@ -9,6 +9,7 @@
                 "command" : "./dump-modules.lua"
             },
             "args": [
+                "get-lua",
                 "5.4.7"
             ],
         }

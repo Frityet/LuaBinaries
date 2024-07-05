@@ -1,4 +1,4 @@
----@type {[OS] : fun(args: CLIArgs, dl_url: string)}
+---@type {[OS] : fun(args: GetLuaArguments, dl_url: string)}
 return {
     macosx   = require("builders.jit.posix"),
     linux   = require("builders.jit.posix"),

@@ -11,8 +11,8 @@ function require(name)
     return ret, data
 end
 
-dofile("binary-creator.lua")
-loaded_modules["$!main!$"] = "binary-creator.lua"
+dofile("main.lua")
+loaded_modules["$!main!$"] = "main.lua"
 
 local Path = require("utilities.Path")
 for k, v in pairs(loaded_modules) do
