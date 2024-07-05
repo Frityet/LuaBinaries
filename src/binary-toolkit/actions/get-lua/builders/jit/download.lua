@@ -1,5 +1,5 @@
 local easyhttp = require("easyhttp")
-local Path = require("utilities.Path")
+local Path = require("binary-toolkit.utilities.Path")
 local zip = require("zip")
 
 ---@param zipfile Path
@@ -37,7 +37,7 @@ return function (url)
             method = "GET",
             follow_redirects = true,
             on_progress = function(dltotal, dlnow, ultotal, ulnow)
-                if os.getenv("LOCAL_LUA_DEBUGGER_VSCODE") ~= "1" then
+                if not DEBUG then
                     io.write(string.format("\rDownloading %s: %.2f%%", url, dlnow / dltotal * 100)):flush()
                 end
             end,

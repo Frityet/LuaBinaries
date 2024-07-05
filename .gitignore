@@ -4,3 +4,4 @@
 /.luarocks
 /lua-aot
 /out
+/profiles

@@ -2,8 +2,8 @@
 
 ---@type argparse
 local argparse = require("argparse")
-local actions = require("actions")
-local utilities = require("utilities")
+local actions = require("binary-toolkit.actions")
+local utilities = require("binary-toolkit.utilities")
 
 ---@alias OS            "linux"  | "macosx" | "windows"
 ---@alias Architecture  "x86_64" | "arm64"  | "aarch64"
@@ -68,5 +68,8 @@ parser:add_complete()
 local args = parser:parse()
 
 for k, v in pairs(actions) do
-    if args[k] then os.exit(v.action(args)) end
+    if args[k:gsub("_", "-")] then
+        local i = v.action(args)
+        os.exit(i)
+    end
 end

@@ -1,7 +1,7 @@
 --- A pure-Lua implementation of untar (unpacking .tar archives)
 --- Adapted from https://github.com/luarocks/luarocks/blob/master/src/luarocks/tools/tar.lua
-local utilities = require("utilities")
-local Path      = require("utilities.Path")
+local utilities = require("binary-toolkit.utilities")
+local Path = require("binary-toolkit.utilities.Path")
 
 local tar = {}
 

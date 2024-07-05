@@ -2,15 +2,25 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug Lua Interpreter",
+            "name": "Debug get-lua 5.4.7",
             "type": "lua-local",
             "request": "launch",
             "program": {
                 "command" : "./dump-modules.lua"
             },
             "args": [
-                "get-lua",
-                "5.4.7"
+                "get-lua", "5.4.7", "-o", "get-lua-5.4.7"
+            ],
+        },
+        {
+            "name": "Debug get-lua LuaJIT",
+            "type": "lua-local",
+            "request": "launch",
+            "program": {
+                "command" : "./dump-modules.lua"
+            },
+            "args": [
+                "get-lua", "LuaJIT", "-o", "get-lua-LuaJIT"
             ],
         }
     ]

@@ -6,5 +6,5 @@
 
 ---@type Action[]
 return {
-    get_lua = require("actions.get-lua")
+    get_lua = require("binary-toolkit.actions.get-lua")
 }

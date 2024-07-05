@@ -84,7 +84,7 @@ function export.check_program(name)
    if host_os == "windows" then
       ok = export.execute("where "..name.." >nul 2>&1", false)
    else
-      ok = export.execcute("command -v "..name.." >/dev/null 2>&1", false)
+      ok = export.execute("command -v "..name.." >/dev/null 2>&1", false)
    end
 
    return ok and name or nil

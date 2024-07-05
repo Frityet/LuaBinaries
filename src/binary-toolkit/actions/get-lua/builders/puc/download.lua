@@ -1,7 +1,7 @@
 local easyhttp = require("easyhttp")
-local Path = require("utilities.Path")
 local zlib = require("zlib")
-local tar = require("utilities.tar")
+local Path = require("binary-toolkit.utilities.Path")
+local tar = require("binary-toolkit.utilities.tar")
 
 ---@param version string
 ---@param url string
@@ -14,7 +14,7 @@ return function (version, url)
         local response, err = easyhttp.request(url, {
             method = "GET",
             on_progress = function(dltotal, dlnow, ultotal, ulnow)
-                if os.getenv("LOCAL_LUA_DEBUGGER_VSCODE") ~= "1" then
+                if not DEBUG then
                     io.write(string.format("\rDownloading %s: %.2f%%", url, dlnow / dltotal * 100)):flush()
                 end
             end,

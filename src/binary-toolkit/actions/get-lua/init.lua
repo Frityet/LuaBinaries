@@ -1,7 +1,7 @@
-local Path = require("utilities.Path")
+local Path = require("binary-toolkit.utilities.Path")
 local easyhttp = require("easyhttp")
-local builders = require("builders")
-local utilities = require("utilities")
+local builders = require("binary-toolkit.actions.get-lua.builders.init")
+local utilities = require("binary-toolkit.utilities")
 
 local export = {}
 
@@ -83,6 +83,7 @@ end
 ---@class GetLuaArguments : BaseArguments
 ---@field version string
 ---@field output Path
+---@field jobs integer
 
 ---@param args GetLuaArguments
 ---@return integer
